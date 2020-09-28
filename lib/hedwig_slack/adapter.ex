@@ -41,11 +41,15 @@ defmodule Hedwig.Adapters.Slack do
   end
 
   def handle_info(:rtm_start, %{token: token} = state) do
-    case RTM.start(token) do
-      {:ok, %{body: data}} ->
+    case RTM.start(token, recv_timeout: 30_000) do
+      {:ok, %{body: %{"ok" => false}} = res} ->
+        handle_network_failure(res, state)
+
+      {:ok, %{body: %{"url" => url} = data}} ->
         handle_rtm_data(data)
-        {:ok, conn, ref} = Connection.start(data["url"])
+        {:ok, conn, ref} = Connection.start(url)
         {:noreply, %State{state | conn: conn, conn_ref: ref}}
+
       {:error, _} = error ->
         handle_network_failure(error, state)
     end
